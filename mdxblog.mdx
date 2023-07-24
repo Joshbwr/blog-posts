@@ -98,9 +98,12 @@ export const getPostsMeta = async ({
   return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
 };
 ```
+<br />
+
 This works by fetching the file tree from our repo and filtering out any files that do not end with .mdx. 
 The parameter limit is optional and will limit the amount of posts returned. This is how I only display 3 posts on my homepage.
 Now lets create the getPostByName function.
+
 <br />
 
 ```tsx
@@ -159,9 +162,11 @@ export const getPostByName = async (
   return blogPostObj;
 };
 ```
-the function getPostByName will be responsible for fetching a single mdx file and parsing it's raw contents. We will use this function to fetch a single post when we need it. 
-We iterate over each file returned from getPostsMeta and using the method compileMDX from next-mdx-remote we parse the raw contents of the file into a usable format.
-You may notice the variable frontmatter being used here, this is the metadata that we will be using to populate our blog post. Frontmatter allows you
+<br />
+
+The function getPostByName will be responsible for fetching a single mdx file and parsing it's raw contents. We will use this function to fetch a single post when we need it. 
+We iterate over each file returned from getPostsMeta. If we have a successful response we will use the method compileMDX from next-mdx-remote, this will parse the raw contents of the file into a usable format.
+You may notice the variable frontmatter being used here, this is the metadata that I use to populate my cards for each blog post. Frontmatter allows you
 to define data that can be extracted. In this case we are defining the title, date, tags, and description of our blog post.
 Now your file should look like this. 
 <br />
@@ -268,5 +273,6 @@ export const getPostsMeta = async ({
   return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
 };
 ```
-Now lets see how we can use these functions to fetch our posts. 
+<br />
+Checkout part 2 to see how we can use these functions to fetch our posts. 
 <br />
