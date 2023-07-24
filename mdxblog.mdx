@@ -16,8 +16,139 @@ Your first task involves establishing a GitHub repository and generating a new p
 Let's dive in: to kickstart this process, your initial steps should focus on configuring a GitHub repository.
 This will serve as the external home for your MDX files. Simultaneously, you'll need to create a personal access token.
 This token is a crucial element of the setup, providing the necessary permissions for seamless operations between your blog and the repository.
-Below you will find where to find the token creation page.
+Below you will find the steps to create a new token.
 <br />
-<CustomImage src="https://raw.githubusercontent.com/Joshbwr/blog-posts/main/images/find_settings.png" alt="Settings" />
+
+- Navigate to your GitHub account settings.
+- Click on the Developer Settings tab.
+- Select Personal Access Tokens.
+- Click Tokens (classic).
+- Click Generate New Token (classic).
+
+Be sure to save your token in a secure location. You will not be able to view it again after leaving the creation page.
 <br />
-<CustomImage src="https://raw.githubusercontent.com/Joshbwr/blog-posts/main/images/access_token.png" alt="Access Token" />
+
+Alright, now you have a token. Assuming you already have a repo setup with your nextjs boilerplate, let's get started.
+I've created a new file called posts.ts inside of my lib directory. This file will be responsible for fetching our posts from our external repo.
+Take a look at the code below and we will walk through it.
+
+```tsx
+import { compileMDX } from "next-mdx-remote/rsc";
+import rehypeSlug from "rehype-slug";
+import rehypeHighlight from "rehype-highlight/lib";
+import rehypeAutolinkHeadings from "rehype-autolink-headings/lib";
+import CustomImage from "@/components/shared/custom-image";
+
+export const getPostByName = async (
+  fileName: string
+): Promise<BlogPost | undefined> => {
+  const res = await fetch(
+    `https://raw.githubusercontent.com/Joshbwr/blog-posts/main/${fileName}`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  );
+
+  if (!res.ok) return undefined;
+
+  const rawMDX = await res.text();
+  if (rawMDX === "404: Not Found") return undefined;
+
+  const { frontmatter, content } = await compileMDX<{
+    title: string;
+    date: string;
+    tags: string[];
+    description: string;
+  }>({
+    source: rawMDX,
+    components: { CustomImage },
+    options: {
+      parseFrontmatter: true,
+      mdxOptions: {
+        rehypePlugins: [
+          rehypeHighlight,
+          rehypeSlug,
+          [rehypeAutolinkHeadings, { behavior: "wrap" }],
+        ],
+      },
+    },
+  });
+
+  // Get file name without extension
+  const id = fileName.replace(/\.mdx$/, "");
+
+  const blogPostObj: BlogPost = {
+    meta: {
+      id,
+      title: frontmatter.title,
+      date: frontmatter.date,
+      tags: frontmatter.tags,
+      description: frontmatter.description,
+    },
+    content,
+  };
+  return blogPostObj;
+};
+
+interface PostMetaProps {
+  limit?: number;
+}
+
+export const getPostsMeta = async ({
+  limit,
+}: PostMetaProps): Promise<Meta[] | undefined> => {
+  const res = await fetch(
+    "https://api.github.com/repos/Joshbwr/blog-posts/git/trees/main?recursive=1",
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  );
+
+  if (!res.ok) return undefined;
+
+  const repoFiletree: Filetree = await res.json();
+
+  let filesArray = repoFiletree.tree
+    .map((obj) => obj.path)
+    .filter((path) => path.endsWith(".mdx"));
+
+  const posts: Meta[] = [];
+
+  if (limit) filesArray = filesArray.slice(0, limit);
+
+  for (const file of filesArray) {
+    const post = await getPostByName(file);
+    if (post) {
+      const { meta } = post;
+      posts.push(meta);
+    }
+  }
+
+  return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
+};
+```
+<br />
+
+Lets start with getPostsMeta, this function will be responsible for fetching all of our mdx files from our external repo.
+This basically works by fetching the file tree from our repo and filtering out any files that do not end with .mdx. 
+On to getPostByName, this function will be responsible for fetching a single mdx file and parsing it's raw contents. We will use this function to fetch a single post when we need it. 
+We iterate over each file returned from getPostsMeta and using the method compileMDX from next-mdx-remote we parse the raw contents of the file into a usable format.
+You may notice the variable frontmatter being used here, this is the metadata that we will be using to populate our blog post. Frontmatter allows you
+to define data that can be extracted. In this case we are defining the title, date, tags, and description of our blog post.
+An example of this can be seen below.
+
+```mdx
+---
+title: 'testing'
+---
+```
+
+
